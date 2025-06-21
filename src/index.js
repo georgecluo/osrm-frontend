@@ -28,8 +28,12 @@ var map = L.map('map', {
   zoomControl: true,
   dragging: true,
   layers: layers,
-  maxZoom: 18
+  maxZoom: 22
 }).setView(mergedOptions.center, mergedOptions.zoom);
+var OSMRoads = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22,
+  maxNativeZoom: 19
+}).addTo(map);
 
 // Pass basemap layers
 mapLayer = mapLayer.reduce(function(title, layer) {
