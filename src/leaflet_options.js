@@ -56,6 +56,7 @@ module.exports = {
     label: 'Car (fastest)',
     path: 'http://localhost:5000/route/v1'
   }],
+  trajectoryOptimizerUrl: 'http://localhost:5001/optimize',
   layer: [{
     'Mapbox Streets': streets,
     'Mapbox Outdoors': outdoors,

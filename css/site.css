@@ -920,3 +920,22 @@ td.distance {
     margin-right: -400px !important;
     transition: 0.5s;
 }
+
+.optimize-trajectory-button {
+    background-color: #4CAF50; /* Green */
+    border: none;
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+    margin: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    width: calc(100% - 20px);
+}
+
+.optimize-trajectory-button:hover {
+    background-color: #45a049;
+}

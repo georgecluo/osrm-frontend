@@ -268,3 +268,65 @@ L.control.locate({
   showPopup: false,
   locateOptions: {}
 }).addTo(map);
+
+
+// --- NEW CODE TO ADD THE BUTTON ---
+
+// Custom control to trigger the trajectory optimizer
+var OptimizeControl = L.Control.extend({
+  options: {
+    position: 'bottomright'
+  },
+
+  onAdd: function(map) {
+    var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    var button = L.DomUtil.create('a', 'leaflet-control-optimize', container);
+    button.title = localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory';
+
+    // Create span for the sparkle icon
+    var sparkleSpan = L.DomUtil.create('span', 'sparkle-icon', button);
+    sparkleSpan.innerHTML = '&#x2728;'; // Sparkle icon
+
+    // Create span for the text
+    var textSpan = L.DomUtil.create('span', 'optimize-text', button);
+    textSpan.innerHTML = ' ' + (localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory');
+
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.on(button, 'click', L.DomEvent.stop);
+    L.DomEvent.on(button, 'click', this._optimize, this);
+
+    return container;
+  },
+
+  _optimize: function() {
+    var waypoints = lrmControl.getWaypoints();
+    var coordinates = waypoints
+      .filter(function(wp) { return wp.latLng; })
+      .map(function(wp) { return [wp.latLng.lng, wp.latLng.lat]; });
+
+    if (coordinates.length < 2) {
+      alert(localization.t(language, 'Please set at least two waypoints to optimize a trajectory.') || 'Please set at least two waypoints to optimize a trajectory.');
+      return;
+    }
+
+    fetch(leafletOptions.trajectoryOptimizerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates: coordinates }),
+    })
+    .then(function(response) {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.json();
+    })
+    .then(function(data) {
+      var optimizedWaypoints = data.optimized_coordinates.map(function(coord) { return L.latLng(coord[1], coord[0]); });
+      lrmControl.setWaypoints(optimizedWaypoints);
+    })
+    .catch(function(error) {
+      console.error('Error optimizing trajectory:', error);
+      alert(localization.t(language, 'Failed to trigger trajectory optimization. See console for details.') || 'Failed to trigger trajectory optimization. See console for details.');
+    });
+  }
+});
+
+map.addControl(new OptimizeControl());

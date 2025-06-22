@@ -1,0 +1,27 @@
+.leaflet-bar .leaflet-control-optimize {  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: black;
+  line-height: 64px; /* Set explicit height and line-height for vertical centering */
+  height: 64px;
+  width: auto;
+  padding: 0 64px;
+  text-align: center;
+  background-color: #fff; /* White background for the button */
+  border: 1px solid #ccc; /* A subtle border for the button */
+  border-radius: 4px; /* Match the outer container's border-radius */
+  /* Override any default leaflet-bar a styles that might conflict */
+  box-shadow: none; /* The outer .leaflet-bar container will provide the shadow */
+
+}
+
+.leaflet-control-optimize .sparkle-icon {
+  font-size: 1.5em; /* Large font size for the icon */
+}
+
+.leaflet-control-optimize .optimize-text {
+  font-size: 1.2em;
+  white-space: nowrap;
+  margin-left: 5px;
+}
