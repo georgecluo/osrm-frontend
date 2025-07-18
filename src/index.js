@@ -132,64 +132,212 @@ var plan = new ReversablePlan([], {
   }
 });
 
-// add marker labels
-var controlOptions = {
-  plan: plan,
-  routeWhileDragging: options.lrm.routeWhileDragging,
-  lineOptions: options.lrm.lineOptions,
-  altLineOptions: options.lrm.altLineOptions,
-  summaryTemplate: options.lrm.summaryTemplate,
-  containerClassName: options.lrm.containerClassName,
-  alternativeClassName: options.lrm.alternativeClassName,
-  stepClassName: options.lrm.stepClassName,
-  language: 'en', // we are injecting own translations via osrm-text-instructions
-  showAlternatives: options.lrm.showAlternatives,
-  units: mergedOptions.units,
-  serviceUrl: leafletOptions.services[0].path,
-  useHints: false,
-  services: leafletOptions.services,
-  useZoomParameter: options.lrm.useZoomParameter,
-  routeDragInterval: options.lrm.routeDragInterval,
-  collapsible: options.lrm.collapsible,
-  itineraryBuilder: new ItineraryBuilder(),
-};
-// translate profile names
-for (var profile = 0, len = controlOptions.services.length; profile < len; profile++)
-{
-  controlOptions.services[profile].label = localization.t(language, controlOptions.services[profile].label) || controlOptions.services[profile].label;
-}
-
-var router = (new L.Routing.OSRMv1(controlOptions));
-router._convertRouteOriginal = router._convertRoute;
-router._convertRoute = function(responseRoute) {
-  // monkey-patch L.Routing.OSRMv1 until it's easier to overwrite with a hook
-  var resp = this._convertRouteOriginal(responseRoute);
-
-  if (resp.instructions && resp.instructions.length) {
-    var i = 0;
-    responseRoute.legs.forEach(function(leg) {
-      leg.steps.forEach(function(step) {
-        // abusing the text property to save the original osrm step
-        // for later use in the itnerary builder
-        resp.instructions[i].text = step;
-        i++;
-      });
+var plan2 = new ReversablePlan([], {
+  geocoder: L.Control.Geocoder.nominatim(),
+  routeWhileDragging: true,
+  createMarker: function(i, wp, n) {
+    var options = {
+      draggable: this.draggableWaypoints,
+      icon: makeIcon(i, n)
+    };
+    var marker = L.marker(wp.latLng, options);
+    marker.on('click', function() {
+      plan2.spliceWaypoints(i, 1);
     });
+    return marker;
+  },
+  routeDragInterval: options.lrm.routeDragInterval,
+  addWaypoints: true,
+  waypointMode: 'snap',
+  position: 'topright',
+  useZoomParameter: options.lrm.useZoomParameter,
+  reverseWaypoints: true,
+  dragStyles: options.lrm.dragStyles,
+  geocodersClassName: options.lrm.geocodersClassName,
+  geocoderPlaceholder: function(i, n) {
+    var startend = [localization.t(language, 'Start - press enter to drop marker'), localization.t(language, 'End - press enter to drop marker')];
+    var via = [localization.t(language, 'Via point - press enter to drop marker')];
+    if (i === 0) {
+      return startend[0];
+    }
+    if (i === (n - 1)) {
+      return startend[1];
+    } else {
+      return via;
+    }
+  }
+});
+
+function createRoutingControl(plan, leafletOptions, language, containerClassName) {
+  var controlOptions = {
+    plan: plan,
+    routeWhileDragging: options.lrm.routeWhileDragging,
+    lineOptions: options.lrm.lineOptions,
+    altLineOptions: options.lrm.altLineOptions,
+    summaryTemplate: options.lrm.summaryTemplate,
+    containerClassName: (options.lrm.containerClassName || '') + ' ' + containerClassName,
+    alternativeClassName: options.lrm.alternativeClassName,
+    stepClassName: options.lrm.stepClassName,
+    language: 'en', // we are injecting own translations via osrm-text-instructions
+    showAlternatives: options.lrm.showAlternatives,
+    units: mergedOptions.units,
+    serviceUrl: leafletOptions.services[0].path,
+    useHints: false,
+    services: leafletOptions.services,
+    useZoomParameter: options.lrm.useZoomParameter,
+    routeDragInterval: options.lrm.routeDragInterval,
+    collapsible: options.lrm.collapsible,
+    itineraryBuilder: new ItineraryBuilder(),
   };
 
-  return resp;
-};
-var lrmControl = L.Routing.control(Object.assign(controlOptions, {
-  router: router
-})).addTo(map);
+  // translate profile names
+  for (var profile = 0, len = controlOptions.services.length; profile < len; profile++)
+  {
+    controlOptions.services[profile].label = localization.t(language, controlOptions.services[profile].label) || controlOptions.services[profile].label;
+  }
+
+  var router = (new L.Routing.OSRMv1(controlOptions));
+  router._convertRouteOriginal = router._convertRoute;
+  router._convertRoute = function(responseRoute) {
+    // console.log('Raw OSRM Route Object:', responseRoute);
+    // monkey-patch L.Routing.OSRMv1 until it's easier to overwrite with a hook
+    var resp = this._convertRouteOriginal(responseRoute);
+
+    if (resp.instructions && resp.instructions.length) {
+      var i = 0;
+      responseRoute.legs.forEach(function(leg) {
+        leg.steps.forEach(function(step) {
+          // abusing the text property to save the original osrm step
+          // for later use in the itnerary builder
+          resp.instructions[i].text = step;
+          i++;
+        });
+      });
+    };
+
+    // console.log('Decoded Route Coordinates:', resp.coordinates);
+    return resp;
+  };
+
+  var lrmControl = L.Routing.control(Object.assign(controlOptions, {
+    router: router
+  }));
+
+  return lrmControl;
+}
+
+var lrmControl = createRoutingControl(plan, leafletOptions, language, 'vehicle-1').addTo(map);
+var lrmControl2 = createRoutingControl(plan2, leafletOptions, language, 'vehicle-2').addTo(map);
 var toolsControl = tools.control(localization.get(mergedOptions.language), localization.getLanguages(), options.tools).addTo(map);
 var state = state(map, lrmControl, toolsControl, mergedOptions);
+
+// --- NEW CODE TO ADD THE BUTTON ---
+
+// Custom control to trigger the trajectory optimizer
+var OptimizeControl = L.Control.extend({
+  options: {
+    position: 'bottomright'
+  },
+
+  initialize: function(options) {
+    L.Control.prototype.initialize.call(this, options);
+    this._routeCoordinates = null;
+    this._optimizedPolyline = null;
+  },
+
+  onAdd: function(map) {
+    var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    var button = L.DomUtil.create('a', 'leaflet-control-optimize', container);
+    this._button = button;
+    button.title = localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory';
+
+    // Create span for the sparkle icon
+    var sparkleSpan = L.DomUtil.create('span', 'sparkle-icon', button);
+    sparkleSpan.innerHTML = '&#x2728;'; // Sparkle icon
+
+    // Create span for the text
+    var textSpan = L.DomUtil.create('span', 'optimize-text', button);
+    textSpan.innerHTML = ' ' + (localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory');
+
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.on(button, 'click', L.DomEvent.stop);
+    L.DomEvent.on(button, 'click', this._optimize, this);
+
+    this._disable();
+
+    return container;
+  },
+
+  _optimize: function() {
+    var coordinates = this._routeCoordinates;
+
+    if (!coordinates || coordinates.length < 2) {
+      alert(localization.t(language, 'Please generate a route first to optimize a trajectory.') || 'Please generate a route first to optimize a trajectory.');
+      return;
+    }
+
+    fetch(leafletOptions.trajectoryOptimizerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates: coordinates }),
+    })
+    .then(function(response) {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.json();
+    })
+    .then(function(data) { // Note: `this` is bound to the control here
+      var optimizedWaypoints = data.optimized_coordinates.map(function(coord) { return L.latLng(coord[1], coord[0]); });
+
+      if (this._optimizedPolyline) {
+        this._map.removeLayer(this._optimizedPolyline);
+      }
+
+      this._optimizedPolyline = L.polyline(optimizedWaypoints, {
+        color: 'green',
+        weight: 5,
+        opacity: 0.8
+      }).addTo(this._map);
+    }.bind(this))
+    .catch(function(error) {
+      console.error('Error optimizing trajectory:', error);
+      alert(localization.t(language, 'Failed to trigger trajectory optimization. See console for details.') || 'Failed to trigger trajectory optimization. See console for details.');
+    });
+  },
+
+  clearOptimizedRoute: function() {
+    if (this._optimizedPolyline) {
+      this._map.removeLayer(this._optimizedPolyline);
+      this._optimizedPolyline = null;
+    }
+  },
+
+  setRouteCoordinates: function(coordinates) {
+    this._routeCoordinates = coordinates;
+    if (coordinates && coordinates.length > 0) {
+      this._enable();
+    } else {
+      this._disable();
+    }
+  },
+
+  _enable: function() {
+    L.DomUtil.removeClass(this._button, 'leaflet-disabled');
+  },
+
+  _disable: function() {
+    L.DomUtil.addClass(this._button, 'leaflet-disabled');
+  }
+});
+
+var optimizeControl = new OptimizeControl();
+map.addControl(optimizeControl);
 
 plan.on('waypointgeocoded', function(e) {
   if (plan._waypoints.filter(function(wp) { return !!wp.latLng; }).length < 2) {
     map.panTo(e.waypoint.latLng);
   }
 });
+
 
 // add onClick event
 map.on('click', function (e){
@@ -222,7 +370,12 @@ lrmControl.on('alternateChosen', function(e) {
 
 // Route export
 lrmControl.on('routeselected', function(e) {
+  optimizeControl.clearOptimizedRoute();
   var route = e.route || {};
+  var routeCoordinates = (route.coordinates || []).map(function (coordinate) {
+    return [coordinate.lng, coordinate.lat];
+  });
+  optimizeControl.setRouteCoordinates(routeCoordinates);
   var routeGeoJSON = {
     type: 'Feature',
     properties: {
@@ -239,17 +392,17 @@ lrmControl.on('routeselected', function(e) {
     },
     geometry: {
       type: 'LineString',
-      coordinates: (route.coordinates || []).map(function (coordinate) {
-        return [coordinate.lng, coordinate.lat];
-      })
+      coordinates: routeCoordinates
     }
   };
   toolsControl.setRouteGeoJSON(routeGeoJSON);
 });
 plan.on('waypointschanged', function(e) {
+  optimizeControl.clearOptimizedRoute();
   if (!e.waypoints ||
       e.waypoints.filter(function(wp) { return !wp.latLng; }).length > 0) {
     toolsControl.setRouteGeoJSON(null);
+    optimizeControl.setRouteCoordinates(null);
   }
 });
 
@@ -257,6 +410,7 @@ L.control.locate({
   follow: false,
   setView: true,
   remainActive: false,
+
   keepCurrentZoomLevel: true,
   stopFollowingOnDrag: false,
   onLocationError: function(err) {
@@ -268,65 +422,3 @@ L.control.locate({
   showPopup: false,
   locateOptions: {}
 }).addTo(map);
-
-
-// --- NEW CODE TO ADD THE BUTTON ---
-
-// Custom control to trigger the trajectory optimizer
-var OptimizeControl = L.Control.extend({
-  options: {
-    position: 'bottomright'
-  },
-
-  onAdd: function(map) {
-    var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-    var button = L.DomUtil.create('a', 'leaflet-control-optimize', container);
-    button.title = localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory';
-
-    // Create span for the sparkle icon
-    var sparkleSpan = L.DomUtil.create('span', 'sparkle-icon', button);
-    sparkleSpan.innerHTML = '&#x2728;'; // Sparkle icon
-
-    // Create span for the text
-    var textSpan = L.DomUtil.create('span', 'optimize-text', button);
-    textSpan.innerHTML = ' ' + (localization.t(language, 'Optimize Trajectory') || 'Optimize Trajectory');
-
-    L.DomEvent.disableClickPropagation(container);
-    L.DomEvent.on(button, 'click', L.DomEvent.stop);
-    L.DomEvent.on(button, 'click', this._optimize, this);
-
-    return container;
-  },
-
-  _optimize: function() {
-    var waypoints = lrmControl.getWaypoints();
-    var coordinates = waypoints
-      .filter(function(wp) { return wp.latLng; })
-      .map(function(wp) { return [wp.latLng.lng, wp.latLng.lat]; });
-
-    if (coordinates.length < 2) {
-      alert(localization.t(language, 'Please set at least two waypoints to optimize a trajectory.') || 'Please set at least two waypoints to optimize a trajectory.');
-      return;
-    }
-
-    fetch(leafletOptions.trajectoryOptimizerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coordinates: coordinates }),
-    })
-    .then(function(response) {
-      if (!response.ok) throw new Error('Network response was not ok');
-      return response.json();
-    })
-    .then(function(data) {
-      var optimizedWaypoints = data.optimized_coordinates.map(function(coord) { return L.latLng(coord[1], coord[0]); });
-      lrmControl.setWaypoints(optimizedWaypoints);
-    })
-    .catch(function(error) {
-      console.error('Error optimizing trajectory:', error);
-      alert(localization.t(language, 'Failed to trigger trajectory optimization. See console for details.') || 'Failed to trigger trajectory optimization. See console for details.');
-    });
-  }
-});
-
-map.addControl(new OptimizeControl());
