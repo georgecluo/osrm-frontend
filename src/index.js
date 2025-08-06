@@ -12,6 +12,7 @@ var tools = require('./tools');
 var state = require('./state');
 var localization = require('./localization');
 var optimizeControl = require('./optimize');
+var createRoutingControl = require('./routing');
 require('./polyfill');
 
 var parsedOptions = links.parse(window.location.search.slice(1));
@@ -133,102 +134,7 @@ var plan = new ReversablePlan([], {
   }
 });
 
-var plan2 = new ReversablePlan([], {
-  geocoder: L.Control.Geocoder.nominatim(),
-  routeWhileDragging: true,
-  createMarker: function(i, wp, n) {
-    var options = {
-      draggable: this.draggableWaypoints,
-      icon: makeIcon(i, n)
-    };
-    var marker = L.marker(wp.latLng, options);
-    marker.on('click', function() {
-      plan2.spliceWaypoints(i, 1);
-    });
-    return marker;
-  },
-  routeDragInterval: options.lrm.routeDragInterval,
-  addWaypoints: true,
-  waypointMode: 'snap',
-  position: 'topright',
-  useZoomParameter: options.lrm.useZoomParameter,
-  reverseWaypoints: true,
-  dragStyles: options.lrm.dragStyles,
-  geocodersClassName: options.lrm.geocodersClassName,
-  geocoderPlaceholder: function(i, n) {
-    var startend = [localization.t(language, 'Start - press enter to drop marker'), localization.t(language, 'End - press enter to drop marker')];
-    var via = [localization.t(language, 'Via point - press enter to drop marker')];
-    if (i === 0) {
-      return startend[0];
-    }
-    if (i === (n - 1)) {
-      return startend[1];
-    } else {
-      return via;
-    }
-  }
-});
-
-function createRoutingControl(plan, leafletOptions, language, containerClassName) {
-  var controlOptions = {
-    plan: plan,
-    routeWhileDragging: options.lrm.routeWhileDragging,
-    lineOptions: options.lrm.lineOptions,
-    altLineOptions: options.lrm.altLineOptions,
-    summaryTemplate: options.lrm.summaryTemplate,
-    containerClassName: (options.lrm.containerClassName || '') + ' ' + containerClassName,
-    alternativeClassName: options.lrm.alternativeClassName,
-    stepClassName: options.lrm.stepClassName,
-    language: 'en', // we are injecting own translations via osrm-text-instructions
-    showAlternatives: options.lrm.showAlternatives,
-    units: mergedOptions.units,
-    serviceUrl: leafletOptions.services[0].path,
-    useHints: false,
-    services: leafletOptions.services,
-    useZoomParameter: options.lrm.useZoomParameter,
-    routeDragInterval: options.lrm.routeDragInterval,
-    collapsible: options.lrm.collapsible,
-    itineraryBuilder: new ItineraryBuilder(),
-  };
-
-  // translate profile names
-  for (var profile = 0, len = controlOptions.services.length; profile < len; profile++)
-  {
-    controlOptions.services[profile].label = localization.t(language, controlOptions.services[profile].label) || controlOptions.services[profile].label;
-  }
-
-  var router = (new L.Routing.OSRMv1(controlOptions));
-  router._convertRouteOriginal = router._convertRoute;
-  router._convertRoute = function(responseRoute) {
-    // console.log('Raw OSRM Route Object:', responseRoute);
-    // monkey-patch L.Routing.OSRMv1 until it's easier to overwrite with a hook
-    var resp = this._convertRouteOriginal(responseRoute);
-
-    if (resp.instructions && resp.instructions.length) {
-      var i = 0;
-      responseRoute.legs.forEach(function(leg) {
-        leg.steps.forEach(function(step) {
-          // abusing the text property to save the original osrm step
-          // for later use in the itnerary builder
-          resp.instructions[i].text = step;
-          i++;
-        });
-      });
-    };
-
-    // console.log('Decoded Route Coordinates:', resp.coordinates);
-    return resp;
-  };
-
-  var lrmControl = L.Routing.control(Object.assign(controlOptions, {
-    router: router
-  }));
-
-  return lrmControl;
-}
-
-var lrmControl = createRoutingControl(plan, leafletOptions, language, 'vehicle-1').addTo(map);
-var lrmControl2 = createRoutingControl(plan2, leafletOptions, language, 'vehicle-2').addTo(map);
+var lrmControl = createRoutingControl(plan, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-1').addTo(map);
 var toolsControl = tools.control(localization.get(mergedOptions.language), localization.getLanguages(), options.tools).addTo(map);
 var state = state(map, lrmControl, toolsControl, mergedOptions);
 
