@@ -98,7 +98,8 @@ function makeIcon(i, n) {
     });
   }
 }
-var plan = new ReversablePlan([], {
+
+var planOptions = {
   geocoder: L.Control.Geocoder.nominatim(),
   routeWhileDragging: true,
   createMarker: function(i, wp, n) {
@@ -132,7 +133,10 @@ var plan = new ReversablePlan([], {
       return via;
     }
   }
-});
+};
+
+var plan = new ReversablePlan([], planOptions);
+var plan2 = new ReversablePlan([], planOptions);
 
 var lrmControl = createRoutingControl(plan, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-1').addTo(map);
 var toolsControl = tools.control(localization.get(mergedOptions.language), localization.getLanguages(), options.tools).addTo(map);
