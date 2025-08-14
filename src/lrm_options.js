@@ -1,7 +1,6 @@
 'use strict';
 
 var mapView = require('./leaflet_options');
-var createGeocoder = require('./geocoder');
 
 module.exports = {
   lrm: {
@@ -28,7 +27,6 @@ module.exports = {
     alternativeClassName: 'osrm-directions-instructions',
     stepClassName: 'osrm-directions-step',
     geocodersClassName: 'osrm-directions-inputs',
-    createGeocoder: createGeocoder,
     showAlternatives: true,
     useZoomParameter: false,
     routeDragInterval: 200,
