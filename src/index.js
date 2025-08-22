@@ -116,7 +116,7 @@ var planOptions = {
   routeDragInterval: options.lrm.routeDragInterval,
   addWaypoints: true,
   waypointMode: 'snap',
-  position: 'topright',
+  position: 'bottomleft',
   useZoomParameter: options.lrm.useZoomParameter,
   reverseWaypoints: true,
   dragStyles: options.lrm.dragStyles,
@@ -139,6 +139,23 @@ var plan = new ReversablePlan([], planOptions);
 var plan2 = new ReversablePlan([], planOptions);
 
 var lrmControl = createRoutingControl(plan, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-1').addTo(map);
+var lrmControl2 = createRoutingControl(plan2, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-2').addTo(map);
+
+// Position control panels so they don't overlap
+const controlPanels = document.querySelectorAll('.osrm-directions-inputs');
+controlPanels.forEach((panel, index) => {
+  // stack them vertically.
+  // This is a basic example; for a more robust solution, you might need
+  // to calculate height dynamically or use a more advanced layout system.
+  const topPosition = 10 + (index * 250); // Adjust 250 based on estimated panel height
+  panel.style.position = 'fixed';
+  panel.style.left = '10px';
+  panel.style.top = `${topPosition}px`;
+  panel.style.width = '350px';
+  panel.style.maxHeight = 'calc(50% - 20px)';
+  panel.style.overflow = 'auto';
+});
+
 var toolsControl = tools.control(localization.get(mergedOptions.language), localization.getLanguages(), options.tools).addTo(map);
 var state = state(map, lrmControl, toolsControl, mergedOptions);
 
@@ -155,6 +172,12 @@ plan.on('waypointgeocoded', function(e) {
 // add onClick event
 map.on('click', function (e){
   addWaypoint(e.latlng);
+
+  // For debugging control positions
+  console.log('lrmControl.getPosition() returns: ', lrmControl.getPosition());
+  console.log('lrmControl.options.position is: ', lrmControl.options.position);
+  lrmControl.setPosition('topleft');
+
 });
 function addWaypoint(waypoint) {
   var length = lrmControl.getWaypoints().filter(function(pnt) {

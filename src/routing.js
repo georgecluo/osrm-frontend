@@ -59,6 +59,11 @@ function createRoutingControl(plan, leafletOptions, language, mergedOptions, Iti
     router: router
   }));
 
+    // For convenience, we allow some control options to be set on the plan
+  if (plan.options.position) {
+    lrmControl.setPosition(plan.options.position);
+  }
+
   return lrmControl;
 }
 
