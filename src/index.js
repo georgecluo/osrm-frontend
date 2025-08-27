@@ -141,17 +141,23 @@ var plan2 = new ReversablePlan([], planOptions);
 var lrmControl = createRoutingControl(plan, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-1').addTo(map);
 var lrmControl2 = createRoutingControl(plan2, leafletOptions, language, mergedOptions, ItineraryBuilder, 'vehicle-2').addTo(map);
 
+var activeLrmControl = lrmControl;
+lrmControl.getContainer().classList.add('leaflet-routing-container-active');
+
+function setActiveLrm(lrm) {
+    activeLrmControl.getContainer().classList.remove('leaflet-routing-container-active');
+    activeLrmControl = lrm;
+    activeLrmControl.getContainer().classList.add('leaflet-routing-container-active');
+}
+
+lrmControl.getContainer().addEventListener('click', function() { setActiveLrm(lrmControl); });
+lrmControl2.getContainer().addEventListener('click', function() { setActiveLrm(lrmControl2); });
+
 var toolsControl = tools.control(localization.get(mergedOptions.language), localization.getLanguages(), options.tools).addTo(map);
 var state = state(map, lrmControl, toolsControl, mergedOptions);
 
 var optimizeControl = optimizeControl();
 map.addControl(optimizeControl);
-
-plan.on('waypointgeocoded', function(e) {
-  if (plan._waypoints.filter(function(wp) { return !!wp.latLng; }).length < 2) {
-    map.panTo(e.waypoint.latLng);
-  }
-});
 
 
 // add onClick event
@@ -160,15 +166,15 @@ map.on('click', function (e){
 
 });
 function addWaypoint(waypoint) {
-  var length = lrmControl.getWaypoints().filter(function(pnt) {
+  var length = activeLrmControl.getWaypoints().filter(function(pnt) {
     return pnt.latLng;
   });
   length = length.length;
   if (!length) {
-    lrmControl.spliceWaypoints(0, 1, waypoint);
+    activeLrmControl.spliceWaypoints(0, 1, waypoint);
   } else {
     if (length === 1) length = length + 1;
-    lrmControl.spliceWaypoints(length - 1, 1, waypoint);
+    activeLrmControl.spliceWaypoints(length - 1, 1, waypoint);
   }
 }
 
