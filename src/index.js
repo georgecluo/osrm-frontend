@@ -178,55 +178,62 @@ function addWaypoint(waypoint) {
   }
 }
 
-// User selected routes
-lrmControl.on('alternateChosen', function(e) {
-  var directions = document.querySelectorAll('.leaflet-routing-alt');
-  if (directions[0].style.display != 'none') {
-    directions[0].style.display = 'none';
-    directions[1].style.display = 'block';
-  } else {
-    directions[0].style.display = 'block';
-    directions[1].style.display = 'none';
-  }
-});
-
-// Route export
-lrmControl.on('routeselected', function(e) {
-  optimizeControl.clearOptimizedRoute();
-  var route = e.route || {};
-  var routeCoordinates = (route.coordinates || []).map(function (coordinate) {
-    return [coordinate.lng, coordinate.lat];
-  });
-  optimizeControl.setRouteCoordinates(routeCoordinates);
-  var routeGeoJSON = {
-    type: 'Feature',
-    properties: {
-      name: route.name,
-      copyright: {
-        author: 'OpenStreetMap contributors',
-        license: 'http://www.openstreetmap.org/copyright'
-      },
-      link: {
-        href: window.document.location.href,
-        text: window.document.title
-      },
-      time: (new Date()).toISOString()
-    },
-    geometry: {
-      type: 'LineString',
-      coordinates: routeCoordinates
+function setupRouteEventHandlers(control, plan) {
+  // User selected routes
+  control.on('alternateChosen', function() {
+    var directions = this.getContainer().querySelectorAll('.leaflet-routing-alt');
+    if (directions.length > 1) {
+      if (directions[0].style.display !== 'none') {
+        directions[0].style.display = 'none';
+        directions[1].style.display = 'block';
+      } else {
+        directions[0].style.display = 'block';
+        directions[1].style.display = 'none';
+      }
     }
-  };
-  toolsControl.setRouteGeoJSON(routeGeoJSON);
-});
-plan.on('waypointschanged', function(e) {
-  optimizeControl.clearOptimizedRoute();
-  if (!e.waypoints ||
-      e.waypoints.filter(function(wp) { return !wp.latLng; }).length > 0) {
-    toolsControl.setRouteGeoJSON(null);
-    optimizeControl.setRouteCoordinates(null);
-  }
-});
+  });
+
+  // Route export
+  control.on('routeselected', function(e) {
+    optimizeControl.clearOptimizedRoute();
+    var route = e.route || {};
+    var routeCoordinates = (route.coordinates || []).map(function (coordinate) {
+      return [coordinate.lng, coordinate.lat];
+    });
+    optimizeControl.setRouteCoordinates(routeCoordinates);
+    var routeGeoJSON = {
+      type: 'Feature',
+      properties: {
+        name: route.name,
+        copyright: {
+          author: 'OpenStreetMap contributors',
+          license: 'http://www.openstreetmap.org/copyright'
+        },
+        link: {
+          href: window.document.location.href,
+          text: window.document.title
+        },
+        time: (new Date()).toISOString()
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: routeCoordinates
+      }
+    };
+    toolsControl.setRouteGeoJSON(routeGeoJSON);
+  });
+
+  plan.on('waypointschanged', function(e) {
+    optimizeControl.clearOptimizedRoute();
+    if (!e.waypoints || e.waypoints.filter(function(wp) { return !wp.latLng; }).length > 0) {
+      toolsControl.setRouteGeoJSON(null);
+      optimizeControl.setRouteCoordinates(null);
+    }
+  });
+}
+
+setupRouteEventHandlers(lrmControl, plan);
+setupRouteEventHandlers(lrmControl2, plan2);
 
 L.control.locate({
   follow: false,
